@@ -65,21 +65,22 @@ def resumo(tdb: TenantDB, mes: Annotated[str, Query(pattern=r"^\d{4}-\d{2}$")]) 
 
     por_categoria.sort(key=lambda c: c.total_centavos, reverse=True)
 
-    # O destino sai da descrição (não é coluna), então agrupa em Python.
+    # Destino (gastos) e origem (entradas) saem da descrição, não são coluna: agrupa em Python.
     descricoes = tdb.session.execute(
-        select(Transacao.descricao, Transacao.valor_centavos)
+        select(Transacao.tipo, Transacao.descricao, Transacao.valor_centavos)
         .outerjoin(Categoria, Categoria.id == Transacao.categoria_id)
         .where(
             Transacao.data_competencia >= inicio,
             Transacao.data_competencia <= fim,
-            Transacao.tipo == TipoTransacao.despesa,
             or_(Categoria.fora_do_resumo.is_(None), Categoria.fora_do_resumo == false()),
         )
     ).all()
     por_destino: dict[str, DestinoResumo] = {}
-    for descricao, valor in descricoes:
+    por_origem: dict[str, DestinoResumo] = {}
+    for tipo, descricao, valor in descricoes:
         d = destino(descricao)
-        item = por_destino.setdefault(d.chave, DestinoResumo(chave=d.chave, nome=d.nome, total_centavos=0, quantidade=0))
+        grupo = por_destino if tipo == TipoTransacao.despesa else por_origem
+        item = grupo.setdefault(d.chave, DestinoResumo(chave=d.chave, nome=d.nome, total_centavos=0, quantidade=0))
         item.total_centavos += valor
         item.quantidade += 1
     return ResumoMesOut(
@@ -90,5 +91,6 @@ def resumo(tdb: TenantDB, mes: Annotated[str, Query(pattern=r"^\d{4}-\d{2}$")]) 
         fora_do_resumo_centavos=fora,
         despesas_por_categoria=por_categoria,
         despesas_por_destino=sorted(por_destino.values(), key=lambda d: d.total_centavos, reverse=True),
+        receitas_por_origem=sorted(por_origem.values(), key=lambda d: d.total_centavos, reverse=True),
         quantidade_transacoes=quantidade,
     )

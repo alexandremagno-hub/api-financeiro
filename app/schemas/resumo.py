@@ -9,7 +9,8 @@ class CategoriaResumo(OutputModel):
 
 
 class DestinoResumo(OutputModel):
-    # Chave normalizada do destino; serve de filtro em GET /transacoes?destino=.
+    # Chave normalizada do destino (ou da origem, nas entradas); serve de filtro em
+    # GET /transacoes?destino= (com tipo=receita para as origens).
     chave: str
     nome: str
     total_centavos: int
@@ -25,4 +26,6 @@ class ResumoMesOut(OutputModel):
     fora_do_resumo_centavos: int
     despesas_por_categoria: list[CategoriaResumo]
     despesas_por_destino: list[DestinoResumo]
+    # Quem enviou o dinheiro (pessoa, empresa, banco), maior primeiro.
+    receitas_por_origem: list[DestinoResumo]
     quantidade_transacoes: int

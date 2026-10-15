@@ -49,6 +49,8 @@ def test_importa_nubank_cria_conta_categoriza_e_resume_o_mes(client, tenant_fact
     assert resumo["despesas_por_categoria"][0]["nome"] == "Alimentação"  # maior primeiro
     por_destino = [(d["nome"], d["total_centavos"], d["quantidade"]) for d in resumo["despesas_por_destino"]]
     assert por_destino == [("iFood", 11600, 2), ("Padaria do Zé", 4590, 1), ("Uber", 2350, 1)]
+    por_origem = [(o["nome"], o["total_centavos"], o["quantidade"]) for o in resumo["receitas_por_origem"]]
+    assert por_origem == [("Salario Empresa", 350000, 1)]  # "Pagamento recebido" (fatura) fica fora
 
     ifood = client.get("/transacoes", params={"destino": "ifood", "limit": 1}, headers=t.headers).json()
     assert ifood["total"] == 2 and len(ifood["items"]) == 1
