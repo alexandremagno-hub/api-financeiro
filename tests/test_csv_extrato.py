@@ -14,6 +14,7 @@ from app.services.csv_extrato import (
     parse_valor_centavos,
     sugerir_mapeamento,
 )
+from app.services.destino import destino
 
 NUBANK_CONTA = (
     "Data,Valor,Identificador,Descrição\n"
@@ -134,3 +135,24 @@ def test_generico_sem_mapeamento_e_arquivos_invalidos():
 )
 def test_sugerir_categoria(descricao, categoria):
     assert sugerir_categoria(descricao) == categoria
+
+
+@pytest.mark.parametrize(
+    ("descricao", "nome"),
+    [
+        ("Compra no débito - DL*99 99", "99"),
+        ("Compra no débito - DL          *99 99", "99"),
+        ("Transferência enviada pelo Pix - FULANO DE TAL - •••.123.456-•• - NU PAGAMENTOS - IP (0260) Agência: 1", "Fulano de Tal"),
+        ("Transferência enviada pelo Pix - Dhenice Vitoria Alves Sa - •••.284.273-•• - BANCO INTER (0077)", "Dhenice Vitoria Alves Sa"),
+        ("Transferência enviada pelo Pix - IFOOD.COM AGENCIA DE RESTAURANTES ONLINE S.A. - 14.380.200/0001-21", "iFood"),
+        ("Pagamento de boleto efetuado - G3 TELECOM LTDA", "G3 Telecom"),
+        ("Uber *Trip", "Uber"),
+        ("Loja X - Centro", "Loja X - Centro"),
+    ],
+)
+def test_destino(descricao, nome):
+    assert destino(descricao).nome == nome
+
+
+def test_destino_agrupa_maiusculas_e_espacos():
+    assert destino("Transferência enviada pelo Pix - FULANO DE TAL - x").chave == destino("Pix - Fulano de  Tal").chave

@@ -16,6 +16,7 @@ from app.schemas.transacao import (
     TransacaoPage,
     TransacaoUpdate,
 )
+from app.services.destino import destino as extrair_destino
 
 router = APIRouter(prefix="/transacoes", tags=["transacoes"])
 
@@ -42,6 +43,7 @@ def listar(
     categoria_id: int | None = None,
     incluir_subcategorias: bool = True,
     tipo: TipoTransacao | None = None,
+    destino: str | None = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> TransacaoPage:
@@ -67,8 +69,14 @@ def listar(
     if tipo is not None:
         stmt = stmt.where(Transacao.tipo == tipo)
 
-    total = tdb.count(stmt)
-    items = tdb.scalars(stmt.order_by(coluna.desc(), Transacao.id.desc()).limit(limit).offset(offset))
+    ordem = (coluna.desc(), Transacao.id.desc())
+    if destino is not None:
+        # Chave de /resumo (despesas_por_destino); vem da descrição, então filtra em Python.
+        todos = [t for t in tdb.scalars(stmt.order_by(*ordem)) if extrair_destino(t.descricao).chave == destino]
+        total, items = len(todos), todos[offset : offset + limit]
+    else:
+        total = tdb.count(stmt)
+        items = tdb.scalars(stmt.order_by(*ordem).limit(limit).offset(offset))
     return TransacaoPage(
         items=[TransacaoOut.model_validate(t) for t in items],
         total=total,

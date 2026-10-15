@@ -3,11 +3,12 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import false, func, or_, select
 
 from app.api.deps import TenantDB
 from app.models import Categoria, TipoTransacao, Transacao
-from app.schemas.resumo import CategoriaResumo, ResumoMesOut
+from app.schemas.resumo import CategoriaResumo, DestinoResumo, ResumoMesOut
+from app.services.destino import destino
 
 router = APIRouter(prefix="/resumo", tags=["resumo"])
 
@@ -63,6 +64,24 @@ def resumo(tdb: TenantDB, mes: Annotated[str, Query(pattern=r"^\d{4}-\d{2}$")]) 
             receitas += total
 
     por_categoria.sort(key=lambda c: c.total_centavos, reverse=True)
+
+    # O destino sai da descrição (não é coluna), então agrupa em Python.
+    descricoes = tdb.session.execute(
+        select(Transacao.descricao, Transacao.valor_centavos)
+        .outerjoin(Categoria, Categoria.id == Transacao.categoria_id)
+        .where(
+            Transacao.data_competencia >= inicio,
+            Transacao.data_competencia <= fim,
+            Transacao.tipo == TipoTransacao.despesa,
+            or_(Categoria.fora_do_resumo.is_(None), Categoria.fora_do_resumo == false()),
+        )
+    ).all()
+    por_destino: dict[str, DestinoResumo] = {}
+    for descricao, valor in descricoes:
+        d = destino(descricao)
+        item = por_destino.setdefault(d.chave, DestinoResumo(chave=d.chave, nome=d.nome, total_centavos=0, quantidade=0))
+        item.total_centavos += valor
+        item.quantidade += 1
     return ResumoMesOut(
         mes=mes,
         total_despesas_centavos=despesas,
@@ -70,5 +89,6 @@ def resumo(tdb: TenantDB, mes: Annotated[str, Query(pattern=r"^\d{4}-\d{2}$")]) 
         saldo_centavos=receitas - despesas,
         fora_do_resumo_centavos=fora,
         despesas_por_categoria=por_categoria,
+        despesas_por_destino=sorted(por_destino.values(), key=lambda d: d.total_centavos, reverse=True),
         quantidade_transacoes=quantidade,
     )

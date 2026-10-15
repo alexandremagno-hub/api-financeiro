@@ -47,6 +47,11 @@ def test_importa_nubank_cria_conta_categoriza_e_resume_o_mes(client, tenant_fact
     por_cat = {c["nome"]: c["total_centavos"] for c in resumo["despesas_por_categoria"]}
     assert por_cat == {"Alimentação": 4590 + 11600, "Transporte": 2350}
     assert resumo["despesas_por_categoria"][0]["nome"] == "Alimentação"  # maior primeiro
+    por_destino = [(d["nome"], d["total_centavos"], d["quantidade"]) for d in resumo["despesas_por_destino"]]
+    assert por_destino == [("iFood", 11600, 2), ("Padaria do Zé", 4590, 1), ("Uber", 2350, 1)]
+
+    ifood = client.get("/transacoes", params={"destino": "ifood", "limit": 1}, headers=t.headers).json()
+    assert ifood["total"] == 2 and len(ifood["items"]) == 1
     assert client.get("/resumo/meses", headers=t.headers).json() == ["2026-10"]
 
 
