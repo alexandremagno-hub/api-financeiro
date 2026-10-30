@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import select
 
 from app.api.deps import TenantDB
-from app.api.routes._helpers import apply_updates, commit_or_409, get_or_404
+from app.api.routes._helpers import apply_updates, commit_or_409, filtro_meses, get_or_404
 from app.api.routes.categorias import descendentes
 from app.db.tenant import TenantSession
 from app.models import Categoria, Conta, TipoTransacao, Transacao
@@ -38,6 +38,8 @@ def listar(
     tdb: TenantDB,
     data_inicio: date | None = None,
     data_fim: date | None = None,
+    # Meses AAAA-MM, repetível (?mes=2026-01&mes=2026-03); soma-se ao intervalo acima.
+    mes: Annotated[list[str] | None, Query()] = None,
     campo_data: CampoData = CampoData.competencia,
     conta_id: int | None = None,
     categoria_id: int | None = None,
@@ -61,6 +63,8 @@ def listar(
         stmt = stmt.where(coluna >= data_inicio)
     if data_fim:
         stmt = stmt.where(coluna <= data_fim)
+    if mes:
+        stmt = stmt.where(filtro_meses(coluna, mes))
     if conta_id is not None:
         stmt = stmt.where(Transacao.conta_id == conta_id)
     if categoria_id is not None:

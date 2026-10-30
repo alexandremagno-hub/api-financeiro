@@ -18,7 +18,7 @@ class DestinoResumo(OutputModel):
 
 
 class ResumoMesOut(OutputModel):
-    mes: str  # AAAA-MM
+    meses: list[str]  # AAAA-MM somados, do mais recente ao mais antigo
     total_despesas_centavos: int
     total_receitas_centavos: int
     saldo_centavos: int

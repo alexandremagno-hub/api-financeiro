@@ -104,3 +104,33 @@ def test_conta_com_transacoes_nao_pode_ser_removida(client, ctx):
 def test_categoria_nao_aceita_ciclo(client, ctx):
     r = client.patch(f"/categorias/{ctx['casa']}", json={"categoria_pai_id": ctx["luz"]}, headers=ctx["h"])
     assert r.status_code == 422
+
+
+def test_varios_meses_somam_no_resumo_e_filtram_a_lista(client, ctx):
+    h = ctx["h"]
+    conta = ctx["corrente"]
+    _criar(client, h, conta_id=conta, valor_centavos=1000, data_competencia="2026-01-31")
+    _criar(client, h, conta_id=conta, valor_centavos=2000, data_competencia="2026-02-15")
+    _criar(client, h, conta_id=conta, valor_centavos=4000, data_competencia="2026-03-01")
+    _criar(client, h, conta_id=conta, tipo="receita", valor_centavos=9000, data_competencia="2026-03-10")
+
+    # Meses salteados: janeiro e março, sem fevereiro.
+    params = [("mes", "2026-03"), ("mes", "2026-01"), ("mes", "2026-01")]
+    r = client.get("/resumo", params=params, headers=h)
+    assert r.status_code == 200, r.text
+    resumo = r.json()
+    assert resumo["meses"] == ["2026-03", "2026-01"]  # sem repetição, mais recente primeiro
+    assert resumo["total_despesas_centavos"] == 5000
+    assert resumo["total_receitas_centavos"] == 9000
+    assert resumo["quantidade_transacoes"] == 3
+
+    lista = client.get("/transacoes", params=params, headers=h).json()
+    assert lista["total"] == 3
+    assert [t["data_competencia"] for t in lista["items"]] == ["2026-03-10", "2026-03-01", "2026-01-31"]
+
+
+def test_resumo_exige_mes_valido(client, ctx):
+    h = ctx["h"]
+    assert client.get("/resumo", headers=h).status_code == 422
+    assert client.get("/resumo", params={"mes": "2026-13"}, headers=h).status_code == 422
+    assert client.get("/transacoes", params={"mes": "outubro"}, headers=h).status_code == 422
